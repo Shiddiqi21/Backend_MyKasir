@@ -2,12 +2,13 @@ const { Transaction, TransactionItem } = require("../models");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 
-// Get sales report (summary)
+// Get sales report (summary) - filtered by user's store
 exports.getSalesReport = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { startDate, endDate, period } = req.query;
 
-    let where = {};
+    let where = { storeId }; // Filter by store
 
     // Default: hari ini
     const today = new Date();
@@ -105,12 +106,13 @@ exports.getSalesReport = async (req, res, next) => {
   }
 };
 
-// Get detailed report
+// Get detailed report - filtered by user's store
 exports.getDetailedReport = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { startDate, endDate } = req.query;
 
-    let where = {};
+    let where = { storeId }; // Filter by store
 
     if (startDate && endDate) {
       where.createdAt = {
@@ -137,3 +139,4 @@ exports.getDetailedReport = async (req, res, next) => {
     next(error);
   }
 };
+

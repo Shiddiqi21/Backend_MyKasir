@@ -29,6 +29,18 @@ const Transaction = sequelize.define(
         key: "id",
       },
     },
+    cashierName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    storeId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "stores",
+        key: "id",
+      },
+    },
   },
   {
     tableName: "transactions",
@@ -37,3 +49,5 @@ const Transaction = sequelize.define(
 );
 
 module.exports = Transaction;
+
+

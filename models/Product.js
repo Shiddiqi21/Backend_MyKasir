@@ -35,6 +35,14 @@ const Product = sequelize.define(
       type: DataTypes.STRING,
       allowNull: true,
     },
+    storeId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "stores",
+        key: "id",
+      },
+    },
   },
   {
     tableName: "products",
@@ -43,3 +51,4 @@ const Product = sequelize.define(
 );
 
 module.exports = Product;
+

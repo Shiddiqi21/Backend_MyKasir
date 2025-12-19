@@ -13,6 +13,14 @@ const Customer = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    storeId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "stores",
+        key: "id",
+      },
+    },
   },
   {
     tableName: "customers",
@@ -21,3 +29,4 @@ const Customer = sequelize.define(
 );
 
 module.exports = Customer;
+

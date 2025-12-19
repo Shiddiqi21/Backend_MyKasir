@@ -1,13 +1,14 @@
-const { Transaction, TransactionItem, Customer, Product } = require("../models");
+const { Transaction, TransactionItem, Customer, Product, User } = require("../models");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 
-// Get all transactions
+// Get all transactions (filtered by user's store)
 exports.getAllTransactions = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { startDate, endDate, customerId } = req.query;
 
-    let where = {};
+    let where = { storeId }; // Filter by store
 
     // Filter by date range
     if (startDate && endDate) {
@@ -34,25 +35,42 @@ exports.getAllTransactions = async (req, res, next) => {
           as: "items",
           attributes: ["id", "productName", "unitPrice", "quantity"],
         },
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "name"],
+        },
       ],
       order: [["createdAt", "DESC"]],
     });
 
+    // Map transactions to include cashierName from user if not set
+    const transactionsWithCashier = transactions.map(tx => {
+      const txData = tx.toJSON();
+      // Use cashierName if available, otherwise get from user relation
+      if (!txData.cashierName && txData.user) {
+        txData.cashierName = txData.user.name;
+      }
+      return txData;
+    });
+
     res.json({
       status: "success",
-      data: transactions,
+      data: transactionsWithCashier,
     });
   } catch (error) {
     next(error);
   }
 };
 
-// Get transaction by ID
+// Get transaction by ID (filtered by user's store)
 exports.getTransactionById = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { id } = req.params;
 
-    const transaction = await Transaction.findByPk(id, {
+    const transaction = await Transaction.findOne({
+      where: { id, storeId },
       include: [
         {
           model: Customer,
@@ -83,11 +101,12 @@ exports.getTransactionById = async (req, res, next) => {
   }
 };
 
-// Create transaction
+// Create transaction (assign to user's store)
 exports.createTransaction = async (req, res, next) => {
   const t = await sequelize.transaction();
 
   try {
+    const { storeId } = req.user;
     const { customerId, items } = req.body;
     const userId = req.user?.id;
 
@@ -113,12 +132,18 @@ exports.createTransaction = async (req, res, next) => {
       total += item.unitPrice * item.quantity;
     }
 
+    // Get cashier name from user
+    const user = await User.findByPk(userId);
+    const cashierName = user ? user.name : "Unknown";
+
     // Buat transaksi
     const transaction = await Transaction.create(
       {
         customerId,
         total,
         userId,
+        cashierName,
+        storeId, // Assign to user's store
       },
       { transaction: t }
     );
@@ -134,10 +159,10 @@ exports.createTransaction = async (req, res, next) => {
       { transaction: t }
     );
 
-    // Update stock produk (jika ada)
+    // Update stock produk (jika ada) - filter by storeId
     for (const item of items) {
       const product = await Product.findOne({
-        where: { name: item.productName },
+        where: { name: item.productName, storeId },
         transaction: t,
       });
 
@@ -183,14 +208,16 @@ exports.createTransaction = async (req, res, next) => {
   }
 };
 
-// Delete transaction
+// Delete transaction (only if belongs to user's store)
 exports.deleteTransaction = async (req, res, next) => {
   const t = await sequelize.transaction();
 
   try {
+    const { storeId } = req.user;
     const { id } = req.params;
 
-    const transaction = await Transaction.findByPk(id, {
+    const transaction = await Transaction.findOne({
+      where: { id, storeId },
       include: [
         {
           model: TransactionItem,
@@ -207,10 +234,10 @@ exports.deleteTransaction = async (req, res, next) => {
       });
     }
 
-    // Restore stock (optional, bisa di-comment jika tidak perlu)
+    // Restore stock (optional, bisa di-comment jika tidak perlu) - filter by storeId
     for (const item of transaction.items) {
       const product = await Product.findOne({
-        where: { name: item.productName },
+        where: { name: item.productName, storeId },
         transaction: t,
       });
 
@@ -242,3 +269,4 @@ exports.deleteTransaction = async (req, res, next) => {
     next(error);
   }
 };
+

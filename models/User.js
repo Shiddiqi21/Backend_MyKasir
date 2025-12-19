@@ -26,8 +26,16 @@ const User = sequelize.define(
       allowNull: false,
     },
     role: {
-      type: DataTypes.ENUM("admin", "kasir"),
-      defaultValue: "kasir",
+      type: DataTypes.ENUM("owner", "cashier"),
+      defaultValue: "owner",
+    },
+    storeId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "stores",
+        key: "id",
+      },
     },
   },
   {
@@ -37,3 +45,4 @@ const User = sequelize.define(
 );
 
 module.exports = User;
+

@@ -2,12 +2,13 @@ const { Product } = require("../models");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 
-// Get all products
+// Get all products (filtered by user's store)
 exports.getAllProducts = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { search, category, lowStock } = req.query;
 
-    let where = {};
+    let where = { storeId }; // Filter by store
 
     // Filter search
     if (search) {
@@ -41,12 +42,15 @@ exports.getAllProducts = async (req, res, next) => {
   }
 };
 
-// Get product by ID
+// Get product by ID (filtered by user's store)
 exports.getProductById = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { id } = req.params;
 
-    const product = await Product.findByPk(id);
+    const product = await Product.findOne({
+      where: { id, storeId }
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -64,9 +68,10 @@ exports.getProductById = async (req, res, next) => {
   }
 };
 
-// Create product
+// Create product (assign to user's store)
 exports.createProduct = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { name, category, price, stock, minStock, imageUri } = req.body;
 
     // Validasi input
@@ -84,6 +89,7 @@ exports.createProduct = async (req, res, next) => {
       stock,
       minStock: minStock || 0,
       imageUri,
+      storeId, // Assign to user's store
     });
 
     res.status(201).json({
@@ -96,13 +102,16 @@ exports.createProduct = async (req, res, next) => {
   }
 };
 
-// Update product
+// Update product (only if belongs to user's store)
 exports.updateProduct = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { id } = req.params;
     const { name, category, price, stock, minStock, imageUri } = req.body;
 
-    const product = await Product.findByPk(id);
+    const product = await Product.findOne({
+      where: { id, storeId }
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -130,12 +139,15 @@ exports.updateProduct = async (req, res, next) => {
   }
 };
 
-// Delete product
+// Delete product (only if belongs to user's store)
 exports.deleteProduct = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { id } = req.params;
 
-    const product = await Product.findByPk(id);
+    const product = await Product.findOne({
+      where: { id, storeId }
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -155,11 +167,14 @@ exports.deleteProduct = async (req, res, next) => {
   }
 };
 
-// Get low stock products
+// Get low stock products (filtered by user's store)
 exports.getLowStockProducts = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
+
     const products = await Product.findAll({
       where: {
+        storeId,
         [Op.and]: [
           sequelize.where(
             sequelize.col("stock"),
@@ -181,9 +196,10 @@ exports.getLowStockProducts = async (req, res, next) => {
   }
 };
 
-// Update stock
+// Update stock (only if belongs to user's store)
 exports.updateStock = async (req, res, next) => {
   try {
+    const { storeId } = req.user;
     const { id } = req.params;
     const { stock } = req.body;
 
@@ -194,7 +210,9 @@ exports.updateStock = async (req, res, next) => {
       });
     }
 
-    const product = await Product.findByPk(id);
+    const product = await Product.findOne({
+      where: { id, storeId }
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -214,3 +232,4 @@ exports.updateStock = async (req, res, next) => {
     next(error);
   }
 };
+

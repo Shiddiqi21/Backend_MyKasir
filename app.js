@@ -18,6 +18,7 @@ const productsRouter = require("./routes/products");
 const customersRouter = require("./routes/customers");
 const transactionsRouter = require("./routes/transactions");
 const reportsRouter = require("./routes/reports");
+const collaboratorsRouter = require("./routes/collaborators");
 
 // Import middleware
 const errorHandler = require("./middleware/errorHandler");
@@ -43,6 +44,7 @@ app.use('/api/products', productsRouter);
 app.use('/api/customers', customersRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/collaborators', collaboratorsRouter);
 
 // Legacy routes
 app.use('/', indexRouter);
@@ -64,7 +66,7 @@ sequelize
   });
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
   next(createError(404));
 });
 
