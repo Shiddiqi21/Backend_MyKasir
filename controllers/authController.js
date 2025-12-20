@@ -17,12 +17,23 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    // Cek apakah email sudah terdaftar
-    const existingUser = await User.findOne({ where: { email } });
+    // Validasi panjang password minimum 8 karakter
+    if (password.length < 8) {
+      return res.status(400).json({
+        status: "error",
+        message: "Password minimal 8 karakter",
+      });
+    }
+
+    // Normalisasi email: lowercase dan trim whitespace
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Cek apakah email sudah terdaftar (case-insensitive)
+    const existingUser = await User.findOne({ where: { email: normalizedEmail } });
     if (existingUser) {
       return res.status(400).json({
         status: "error",
-        message: "Email sudah terdaftar",
+        message: "Email sudah terdaftar. Silakan gunakan email lain atau login jika sudah memiliki akun.",
       });
     }
 
@@ -34,9 +45,9 @@ exports.register = async (req, res, next) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Buat user baru sebagai Owner
+    // Buat user baru sebagai Owner dengan email yang sudah dinormalisasi
     const user = await User.create({
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       name,
       role: "owner", // Selalu owner saat register
@@ -69,6 +80,13 @@ exports.register = async (req, res, next) => {
       },
     });
   } catch (error) {
+    // Handle unique constraint violation dari database
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        status: "error",
+        message: "Email sudah terdaftar. Silakan gunakan email lain atau login jika sudah memiliki akun.",
+      });
+    }
     next(error);
   }
 };
@@ -86,9 +104,19 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    // Cari user dengan include Store
+    if (password.length < 8) {
+      return res.status(400).json({
+        status: "error",
+        message: "Password minimal 8 karakter",
+      });
+    }
+
+    // Normalisasi email: lowercase dan trim whitespace
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Cari user dengan include Store (case-insensitive)
     const user = await User.findOne({
-      where: { email },
+      where: { email: normalizedEmail },
       include: [{ model: Store, as: "store" }]
     });
     if (!user) {
@@ -153,6 +181,85 @@ exports.getProfile = async (req, res, next) => {
 
     res.json({
       status: "success",
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        storeId: user.storeId,
+        storeName: user.store?.name,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update profile (Owner only)
+exports.updateProfile = async (req, res, next) => {
+  try {
+    const { name, storeName, oldPassword, newPassword } = req.body;
+
+    // Cari user dengan store
+    const user = await User.findByPk(req.user.id, {
+      include: [{ model: Store, as: "store" }]
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: "error",
+        message: "User tidak ditemukan",
+      });
+    }
+
+    // Hanya owner yang bisa update profile
+    if (user.role !== "owner") {
+      return res.status(403).json({
+        status: "error",
+        message: "Hanya pemilik toko yang dapat mengubah profil",
+      });
+    }
+
+    // Update nama user jika disediakan
+    if (name) {
+      user.name = name;
+    }
+
+    // Update nama toko jika disediakan
+    if (storeName && user.store) {
+      user.store.name = storeName;
+      await user.store.save();
+    }
+
+    // Update password jika disediakan
+    if (newPassword) {
+      // Validasi password lama harus disertakan
+      if (!oldPassword) {
+        return res.status(400).json({
+          status: "error",
+          message: "Password lama harus diisi untuk mengganti password",
+        });
+      }
+
+      // Verifikasi password lama
+      const isValidPassword = await bcrypt.compare(oldPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({
+          status: "error",
+          message: "Password lama tidak sesuai",
+        });
+      }
+
+      // Hash password baru
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    // Simpan perubahan user
+    await user.save();
+
+    res.json({
+      status: "success",
+      message: "Profil berhasil diperbarui",
       data: {
         id: user.id,
         email: user.email,

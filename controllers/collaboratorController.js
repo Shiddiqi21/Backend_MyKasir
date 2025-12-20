@@ -38,21 +38,32 @@ exports.addCollaborator = async (req, res, next) => {
             });
         }
 
-        // Cek apakah email sudah terdaftar
-        const existingUser = await User.findOne({ where: { email } });
+        // Validasi panjang password minimum 8 karakter
+        if (password.length < 8) {
+            return res.status(400).json({
+                status: "error",
+                message: "Password minimal 8 karakter",
+            });
+        }
+
+        // Normalisasi email: lowercase dan trim whitespace
+        const normalizedEmail = email.trim().toLowerCase();
+
+        // Cek apakah email sudah terdaftar (case-insensitive)
+        const existingUser = await User.findOne({ where: { email: normalizedEmail } });
         if (existingUser) {
             return res.status(400).json({
                 status: "error",
-                message: "Email sudah terdaftar",
+                message: "Email sudah terdaftar. Silakan gunakan email lain.",
             });
         }
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Buat user baru sebagai Cashier
+        // Buat user baru sebagai Cashier dengan email yang sudah dinormalisasi
         const cashier = await User.create({
-            email,
+            email: normalizedEmail,
             password: hashedPassword,
             name,
             role: "cashier",
@@ -70,6 +81,13 @@ exports.addCollaborator = async (req, res, next) => {
             },
         });
     } catch (error) {
+        // Handle unique constraint violation dari database
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({
+                status: "error",
+                message: "Email sudah terdaftar. Silakan gunakan email lain.",
+            });
+        }
         next(error);
     }
 };
@@ -133,6 +151,13 @@ exports.updateCollaborator = async (req, res, next) => {
         // Update fields
         if (name) cashier.name = name;
         if (password) {
+            // Validasi panjang password minimum 8 karakter
+            if (password.length < 8) {
+                return res.status(400).json({
+                    status: "error",
+                    message: "Password minimal 8 karakter",
+                });
+            }
             cashier.password = await bcrypt.hash(password, 10);
         }
 
